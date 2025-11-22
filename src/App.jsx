@@ -12,41 +12,83 @@ function App() {
   const axiosCommon = useAxiosCommon();
 
   // initialize Plaid Link
+  // const onSuccess = useCallback(
+  //   async (public_token, metadata) => {
+  //     setStatus("Exchanging public token...");
+  //     try {
+  //       const exchangeResp = await axiosCommon.post(
+  //         "/api/exchange-public-token",
+  //         {
+  //           public_token,
+  //         }
+  //       );
+  //       const { access_token } = exchangeResp.data;
+
+  //       const account_id =
+  //         metadata.accounts && metadata.accounts[0] && metadata.accounts[0].id;
+
+  //       setSelectedAccount(metadata.accounts ? metadata.accounts[0] : null);
+
+  //       setStatus("Creating processor token (Plaid -> Stripe)...");
+  //       const procResp = await axiosCommon.post(
+  //         "/api/create-stripe-bank-account-token",
+  //         {
+  //           access_token,
+  //           account_id,
+  //         }
+  //       );
+
+  //       setProcessorToken(procResp.data.processor_token);
+  //       setStatus("Processor token created. Ready to create Stripe customer.");
+  //     } catch (err) {
+  //       console.error(err);
+  //       setStatus("Error during token exchange / processor token creation.");
+  //     }
+  //   },
+  //   [axiosCommon]
+  // );
+
   const onSuccess = useCallback(
-    async (public_token, metadata) => {
-      setStatus("Exchanging public token...");
-      try {
-        const exchangeResp = await axiosCommon.post(
-          "/api/exchange-public-token",
-          {
-            public_token,
-          }
-        );
-        const { access_token } = exchangeResp.data;
+  async (public_token, metadata) => {
+    setStatus("Exchanging public token...");
 
-        const account_id =
-          metadata.accounts && metadata.accounts[0] && metadata.accounts[0].id;
+    try {
+      // 1) Exchange token
+      const exchangeResp = await axiosCommon.post(
+        "/api/exchange-public-token",
+        { public_token }
+      );
 
-        setSelectedAccount(metadata.accounts ? metadata.accounts[0] : null);
+      const { access_token } = exchangeResp.data;
+      
+      // 2) Get selected account id
+      const account_id = metadata?.accounts?.[0]?.id;
+      setSelectedAccount(metadata.accounts[0]);
+      
+      // 3) Create processor token
+      setStatus("Creating processor token (Plaid -> Stripe)...");
+      
+      console.log(access_token,account_id);
+      const procResp = await axiosCommon.post(
+        "/api/create-stripe-bank-account-token",
+        {
+          access_token,
+          account_id,
+        }
+      );
 
-        setStatus("Creating processor token (Plaid -> Stripe)...");
-        const procResp = await axiosCommon.post(
-          "/api/create-stripe-bank-account-token",
-          {
-            access_token,
-            account_id,
-          }
-        );
+      // FIX: backend now returns processor_token
+      setProcessorToken(procResp.data.processor_token);
 
-        setProcessorToken(procResp.data.processor_token);
-        setStatus("Processor token created. Ready to create Stripe customer.");
-      } catch (err) {
-        console.error(err);
-        setStatus("Error during token exchange / processor token creation.");
-      }
-    },
-    [axiosCommon]
-  );
+      setStatus("Processor token created. Ready to create Stripe customer.");
+    } catch (err) {
+      console.error(err);
+      setStatus("Error during token exchange / processor token creation.");
+    }
+  },
+  [axiosCommon]
+);
+
 
   const onExit = useCallback((err, metadata) => {
     if (err) {
